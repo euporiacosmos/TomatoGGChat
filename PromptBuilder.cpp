@@ -136,10 +136,9 @@ std::string CPromptBuilder::BuildStatsBlock(const PlayerData& d, const AppConfig
 std::string CPromptBuilder::BuildSystem(const PlayerData& d, const AppConfig& cfg)
 {
     const bool wn8 = (d.overview.mode == RatingMode::Wn8);
-    // 현재 시각 가져오기 (UTF-8 변환 포함)
 
     std::string sys =
-        "너는 월드 오브 탱크를 오래 한 입담 좋은 소대장이다. 친근한 존댓말로, 약간 장난스럽게 말하되 "
+        "너는 월드 오브 탱크를 오래 한 입담 좋은 전차장이다. 친근한 존댓말로, 약간 장난스럽게 말하되 "
         "선을 넘는 비하는 하지 않고, 반드시 자연스러운 한국어로만 답변할 것.\n"
         "규칙:\n"
         "1) 아래 [전적]에 있는 숫자와 전차 이름만 사용한다. 없는 숫자, 전차, 맵은 절대 지어내지 않는다.\n";
