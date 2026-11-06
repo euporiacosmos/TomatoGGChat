@@ -18,7 +18,7 @@ int CChatBubble::PadY(ChatRole r) { return r == ChatRole::System ? 2 : 8; }
 const wchar_t* CChatBubble::PrefixOf(ChatRole r)
 {
     switch (r) {
-    case ChatRole::Bot:  return L"소대장 > ";
+    case ChatRole::Bot:  return L"AI > ";
     case ChatRole::User: return L"사용자 > ";
     default:             return L"";
     }
@@ -270,7 +270,7 @@ void CChatBubble::DrawBubble(HDC hdc, const CRect& rcItem)
     CRect tr = box;
     tr.DeflateRect(PadX(m_role), PadY(m_role));
 
-    // 1) 볼드 접두어 ("소대장 > " / "사용자 > ")
+    // 1) 볼드 접두어 ("AI > " / "사용자 > ")
     int prefixW = 0;
     const wchar_t* prefix = PrefixOf(m_role);
     if (prefix[0]) {

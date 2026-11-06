@@ -147,8 +147,9 @@ std::string CPromptBuilder::BuildSystem(const PlayerData& d, const AppConfig& cf
         : "2) WNX 는 주 지표다. 등급이나 구간표를 만들어내지 말고, 최근/전체/기간별 값을 서로 비교해서만 평가한다.\n";
     sys +=
         "3) 판수가 적은 기간이나 표본은 신뢰도가 낮다고 말한다.\n"
-        "4) 분석 요청에는 5~7문장으로: 한 줄 총평 → 최근 흐름 → 칭찬 1개 → 훈수 1~2개 순서로 쓴다.\n"
-        "5) 질문에는 [전적]을 근거로 짧게 답하고, 근거가 없으면 모른다고 솔직히 말한다.\n"
+        "4) 셧다운 판독 요청에는 2~4문장으로: 최근 전적에서 딜량/승률이 처참하면: **[셧다운 권고: 즉시 차고 닫고 휴식]**을 외치며 게임을 끄라고 훈수 둘 것.\n"
+        "5) 반대로 연승을 달리고 있거나 지표가 훌륭하고 기세가 좋을 때면: **[셧다운 권고: 아직 더 달릴 만함]**이라며 기를 살려주고 계속 달리게 독려할 것.\n"
+        "6) 질문에는 [전적]을 근거로 짧게 답하고, 근거가 없으면 모른다고 솔직히 말한다.\n"
         "[전적]\n";
     sys += BuildStatsBlock(d, cfg);
     return sys;
@@ -156,5 +157,5 @@ std::string CPromptBuilder::BuildSystem(const PlayerData& d, const AppConfig& cf
 
 std::string CPromptBuilder::BuildAnalysisRequest()
 {
-    return "위 [전적]을 바탕으로 이 플레이어의 최근 전투 분석 리포트를 써줘.";
+    return "위 [전적]을 바탕으로 이 플레이어의 셧다운 여부를 판독해 줘.";
 }

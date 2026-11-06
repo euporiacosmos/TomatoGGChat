@@ -34,7 +34,7 @@ public:
 private:
     static int PadX(ChatRole r);
     static int PadY(ChatRole r);
-    // 말풍선 맨 앞에 붙는 볼드 접두어 ("소대장 > " / "사용자 > ", 시스템 메시지는 없음)
+    // 말풍선 맨 앞에 붙는 볼드 접두어 ("AI > " / "사용자 > ", 시스템 메시지는 없음)
     static const wchar_t* PrefixOf(ChatRole r);
 
     ChatRole     m_role = ChatRole::System;
@@ -95,7 +95,7 @@ private:
     int  MaxPos() const;
 
     CFont m_font;
-    CFont m_fontBold;             // 접두어(소대장 > / 사용자 > )용
+    CFont m_fontBold;             // 접두어(AI > / 사용자 > )용
     std::vector<Item> m_items;
     int   m_total = 0;            // 전체 콘텐츠 높이
     int   m_pos = 0;              // 현재 스크롤 위치(px)
