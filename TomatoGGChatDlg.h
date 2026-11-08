@@ -23,6 +23,7 @@ protected:
     afx_msg void OnDestroy();
     afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
     afx_msg void OnEnSetfocusEditInput();
+    afx_msg void OnEnChangeEditInput();       // 줄 수가 바뀌면 입력창 높이를 다시 계산
     afx_msg void OnBnClickedSend();            // 평소엔 '전송', 답변 생성 중에는 '중지'
     afx_msg void OnBnClickedRefresh();
     afx_msg LRESULT OnLlmLoaded(WPARAM, LPARAM);
@@ -49,7 +50,17 @@ private:
     HICON        m_hIcon = nullptr;
 
     // ── 레이아웃 ───────────────────────────────────────────────
-    static constexpr int kSendW = 72, kSendH = 26, kInputH = 84;
+    static constexpr int kSendW = 72, kSendH = 26;
+    // 입력창 높이 = (현재 줄 수 + 다음 줄을 위한 여유 1줄). 줄바꿈(Shift+Enter)마다 한 줄 높이만큼 커지고,
+    // 그만큼 채팅창 세로 높이만 줄어든다. (웹뷰 높이는 그대로)
+    static constexpr int kInputMinLines = 2;     // 글 1줄 + 여유 1줄
+    static constexpr int kInputMaxLines = 8;     // 이 이상은 입력창 안에서 스크롤
+    static constexpr int kInputPad = 26;         // 테두리/여백
+    static constexpr int kChatMinH = 80;         // 채팅창 최소 높이
+    int  m_inputH = 0;                 // 현재 입력창 높이(px)
+    int  InputLineHeight();            // 입력창 글꼴의 한 줄 높이(px)
+    int  InputHeightForLines(int lines);
+    int  CalcInputHeight();
     bool  m_layoutReady = false;
     bool  m_webReady = false;
     bool  m_wideLayout = false;  // 가로:세로 ≥ 4:3 이면 true → 채팅이 오른쪽

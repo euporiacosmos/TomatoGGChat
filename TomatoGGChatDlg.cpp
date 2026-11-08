@@ -8,6 +8,25 @@
 #include "PromptBuilder.h"
 #include <format>
 
+namespace {
+    // Edit 컨트롤의 줄바꿈은 "\r\n" 이다. 말풍선/대화 기록/모델에는 "\n" 하나로 통일해서 보낸다. (단독 "\r" 도 "\n")
+    std::wstring ToLf(const std::wstring& s)
+    {
+        std::wstring r;
+        r.reserve(s.size());
+        for (size_t i = 0; i < s.size(); ++i) {
+            if (s[i] == L'\r') {
+                if (i + 1 < s.size() && s[i + 1] == L'\n') ++i;
+                r.push_back(L'\n');
+            }
+            else {
+                r.push_back(s[i]);
+            }
+        }
+        return r;
+    }
+} // namespace
+
 BEGIN_MESSAGE_MAP(CTomatoGGChatDlg, CDialogEx)
     ON_WM_SIZE()
     ON_WM_GETMINMAXINFO()
@@ -15,6 +34,7 @@ BEGIN_MESSAGE_MAP(CTomatoGGChatDlg, CDialogEx)
     ON_WM_DESTROY()
     ON_WM_LBUTTONDOWN()
     ON_EN_SETFOCUS(IDC_EDIT_INPUT, &CTomatoGGChatDlg::OnEnSetfocusEditInput)
+    ON_EN_CHANGE(IDC_EDIT_INPUT, &CTomatoGGChatDlg::OnEnChangeEditInput)
     ON_BN_CLICKED(IDC_BTN_SEND, &CTomatoGGChatDlg::OnBnClickedSend)
     ON_BN_CLICKED(IDC_BTN_REFRESH, &CTomatoGGChatDlg::OnBnClickedRefresh)
     ON_MESSAGE(WM_LLM_LOADED, &CTomatoGGChatDlg::OnLlmLoaded)
@@ -54,6 +74,10 @@ BOOL CTomatoGGChatDlg::OnInitDialog()
     // 입력창: 오른쪽 아래에 겹쳐진 전송 버튼 밑으로 글자가 들어가지 않게 오른쪽 여백을 둔다.
     m_edit.SetLimitText(1000);
     m_edit.SetMargins(4, kSendW + 10);
+    // 입력창이 다시 그려질 때(줄바꿈/스크롤) 위에 겹쳐 놓은 전송 버튼을 덮어쓰지 않도록 형제 윈도우 영역을 클리핑한다.
+    m_edit.ModifyStyle(0, WS_CLIPSIBLINGS);
+    m_btnSend.ModifyStyle(0, WS_CLIPSIBLINGS);
+    m_inputH = CalcInputHeight();
 
     // 디자인용 자리표시자는 숨긴다 (좌표는 코드가 계산)
     if (CWnd* p = GetDlgItem(IDC_WEBVIEW)) p->ShowWindow(SW_HIDE);
@@ -69,12 +93,18 @@ BOOL CTomatoGGChatDlg::OnInitDialog()
 
     AppendSystem(L"TomatoGGChat 시작. Tomato.gg 에서 플레이어를 검색하세요.");
     AppendSystem(L"입력창은 플레이어의 Main 탭에서만 활성화됩니다. (/help 로 명령어 보기)");
+    if (!(m_edit.GetStyle() & ES_MULTILINE))
+        AppendSystem(L"[설정] 입력창(IDC_EDIT_INPUT)의 Multiline 이 꺼져 있어 Shift+Enter 줄바꿈이 동작하지 않아요. "
+            L"리소스 편집기에서 Multiline=True (Auto VScroll, Vertical Scroll 도 True) 로 바꿔 주세요.");
+    else if (!(m_edit.GetStyle() & ES_AUTOVSCROLL))
+        AppendSystem(std::format(L"[설정] 입력창의 Auto VScroll 이 꺼져 있어요. {}줄이 넘으면 더 줄바꿈할 수 없어요. "
+            L"리소스 편집기에서 Auto VScroll=True 로 바꿔 주세요.", kInputMaxLines));
 
     // ── WebView2 생성: 숨겨둔 IDC_WEBVIEW_HOST 자리(m_rcWeb)에 붙는다 ──
     m_web.OnUrlChanged = [this](const std::wstring& url) { OnTomatoUrl(url); };
     m_web.OnFocusChanged = [this](bool focused) {
         m_wheelTarget = focused ? WheelTarget::Web : WheelTarget::Chat;   // 웹뷰 클릭 → 웹 스크롤, 그 외 → 채팅 스크롤
-    };
+        };
     m_web.Init(GetSafeHwnd(), m_rcWeb, m_cfg.startUrl, [this](bool ok) {
         if (!ok) {
             AppendSystem(L"WebView2 초기화에 실패했습니다. Microsoft Edge WebView2 Runtime 이 설치되어 있는지 확인하세요.");
@@ -130,7 +160,7 @@ void CTomatoGGChatDlg::LayoutChildren()
         if (CWnd* p = GetDlgItem(id)) p->MoveWindow(r);
         };
 
-    // 상단 바: 상태 텍스트(왼쪽, 남는 폭 전부) + [새로고침](오른쪽 끝)
+    // 상단 바: 상태 텍스트(왼쪽, 남는 폭 전부) + [다시 읽기](오른쪽 끝)
     const int BTN_W = 90;
     const int barLeft = (int)rc.left + M;
     const int barRight = (int)rc.right - M;
@@ -147,20 +177,29 @@ void CTomatoGGChatDlg::LayoutChildren()
     const CRect body(rc.left + M, y, rc.right - M, rc.bottom - M);
     m_wideLayout = (rc.Width() * 3 >= rc.Height() * 4);        // 가로:세로 ≥ 4:3
 
+    // 입력창은 줄 수만큼 높아지고, 그만큼 채팅창 세로 높이가 줄어든다. (본문 높이의 절반을 넘지 않게 제한)
+    const int inputH = (std::min)(m_inputH > 0 ? m_inputH : CalcInputHeight(), (int)body.Height() / 2);
+
     CRect web, chat, input;
     if (m_wideLayout) {
         const int webW = (std::min)((int)(body.Width() * m_cfg.webRatio), (int)body.Width() - 320);
         web = CRect(body.left, body.top, body.left + webW, body.bottom);
         const CRect side(web.right + G, body.top, body.right, body.bottom);
-        input = CRect(side.left, side.bottom - kInputH, side.right, side.bottom);
+        input = CRect(side.left, side.bottom - inputH, side.right, side.bottom);
         chat = CRect(side.left, side.top, side.right, input.top - G);
     }
     else {
-        const int availH = body.Height() - kInputH - 2 * G;
-        const int webH = (std::min)((int)(availH * m_cfg.webRatio), availH - 120);
+        // 웹뷰 높이는 입력창이 '기본 높이'일 때를 기준으로 정한다. → 입력창이 커져도 웹뷰는 그대로이고 채팅창만 줄어든다.
+        const int availBase = body.Height() - InputHeightForLines(kInputMinLines) - 2 * G;
+        int webH = (std::min)((int)(availBase * m_cfg.webRatio), availBase - 120);
+        int chatH = body.Height() - inputH - 2 * G - webH;
+        if (chatH < kChatMinH) {                                   // 채팅창이 너무 작아지면 그때만 웹뷰를 양보시킨다
+            webH = (std::max)(80, webH - (kChatMinH - chatH));
+            chatH = body.Height() - inputH - 2 * G - webH;
+        }
         web = CRect(body.left, body.top, body.right, body.top + webH);
-        chat = CRect(body.left, web.bottom + G, body.right, body.bottom - kInputH - G);
-        input = CRect(body.left, body.bottom - kInputH, body.right, body.bottom);
+        chat = CRect(body.left, web.bottom + G, body.right, web.bottom + G + (std::max)(chatH, 1));
+        input = CRect(body.left, body.bottom - inputH, body.right, body.bottom);
     }
 
     m_rcWeb = web;
@@ -210,6 +249,42 @@ void CTomatoGGChatDlg::OnLButtonDown(UINT nFlags, CPoint point)
     m_wheelTarget = WheelTarget::Chat;       // MFC 창(빈 영역 포함)을 클릭 → 이후 휠은 채팅 스크롤
     SetFocus();                              // 웹뷰의 포커스를 거둔다
     CDialogEx::OnLButtonDown(nFlags, point);
+}
+
+// 입력창 글꼴의 한 줄 높이 (Edit 의 줄 간격 = tmHeight + tmExternalLeading)
+int CTomatoGGChatDlg::InputLineHeight()
+{
+    if (!m_edit.m_hWnd) return 16;
+    CClientDC dc(&m_edit);
+    CFont* f = m_edit.GetFont();
+    CFont* old = f ? dc.SelectObject(f) : nullptr;
+    TEXTMETRIC tm = {};
+    dc.GetTextMetrics(&tm);
+    if (old) dc.SelectObject(old);
+    return (std::max)(1, (int)(tm.tmHeight + tm.tmExternalLeading));
+}
+
+int CTomatoGGChatDlg::InputHeightForLines(int lines)
+{
+    lines = (std::min)((std::max)(lines, kInputMinLines), kInputMaxLines);
+    return (std::max)(lines * InputLineHeight() + kInputPad, kSendH + 12);   // 전송 버튼(+여백)이 들어갈 최소 높이는 보장
+}
+
+// 현재 줄 수(줄바꿈 + 자동 줄바꿈 포함) + 다음 줄을 쓸 여유 1줄.
+// Auto VScroll 이 꺼진 Edit 는 칸이 모자라면 줄바꿈 자체를 거부하므로, 항상 한 줄 여유를 먼저 만들어 둔다.
+int CTomatoGGChatDlg::CalcInputHeight()
+{
+    const int lines = m_edit.m_hWnd ? m_edit.GetLineCount() : 1;
+    return InputHeightForLines(lines + 1);
+}
+
+void CTomatoGGChatDlg::OnEnChangeEditInput()
+{
+    if (!m_layoutReady) return;
+    const int h = CalcInputHeight();
+    if (h == m_inputH) return;
+    m_inputH = h;
+    LayoutChildren();                                              // 채팅창이 그만큼 줄어든다 (맨 아래를 보고 있으면 그대로 따라간다)
 }
 
 void CTomatoGGChatDlg::OnEnSetfocusEditInput()
@@ -340,7 +415,7 @@ void CTomatoGGChatDlg::PollOverview()
 {
     if (m_pollCount > 40) {                                    // ≈28초
         StopScrape();
-        AppendSystem(L"전적 요약을 읽지 못했어요 (시간 초과). 페이지가 다 뜬 뒤 '새로고침'을 눌러 보세요.");
+        AppendSystem(L"전적 요약을 읽지 못했어요 (시간 초과). 페이지가 다 뜬 뒤 '다시 읽기'를 눌러 보세요.");
         UpdateUi();
         return;
     }
@@ -548,13 +623,13 @@ void CTomatoGGChatDlg::SubmitInput()
     m_edit.GetWindowText(raw);
     raw.Trim();
     if (raw.IsEmpty()) return;
-    const std::wstring text = (LPCWSTR)raw;
+    const std::wstring text = ToLf((LPCWSTR)raw);                   // Shift+Enter 로 넣은 "\r\n" → "\n"
 
     if (text[0] == L'/') { m_edit.SetWindowText(L""); HandleCommand(text); return; }
 
-    if (m_llm.IsBusy())   { AppendSystem(L"답변을 만드는 중이에요. 끝난 뒤에 보내 주세요. (중지 버튼으로 멈출 수 있어요)"); return; }
+    if (m_llm.IsBusy()) { AppendSystem(L"답변을 만드는 중이에요. 끝난 뒤에 보내 주세요. (중지 버튼으로 멈출 수 있어요)"); return; }
     if (!m_llm.IsReady()) { AppendSystem(L"모델을 아직 불러오는 중이에요."); return; }
-    if (!CanAsk())        { AppendSystem(L"전적 수집이 끝나지 않았어요. 잠시만 기다려 주세요."); return; }
+    if (!CanAsk()) { AppendSystem(L"전적 수집이 끝나지 않았어요. 잠시만 기다려 주세요."); return; }
 
     m_edit.SetWindowText(L"");
     m_chat.AddUser(text);
@@ -646,6 +721,6 @@ void CTomatoGGChatDlg::RefreshStatus()
     else if (m_phase == Phase::Done)
         s = std::format(L"{} · {} · 전투 {}판 · {}", m_url.nick, RatingLabel(m_data.overview.mode),
             m_data.battles.size(), m_llm.IsBusy() ? L"답변 생성 중" : (m_llm.IsReady() ? L"대화 가능" : L"모델 로딩 중"));
-    else                             s = L"수집 실패 - '새로고침'을 눌러 보세요.";
+    else                             s = L"수집 실패 - '다시 읽기'를 눌러 보세요.";
     m_status.SetWindowText(s.c_str());
 }
