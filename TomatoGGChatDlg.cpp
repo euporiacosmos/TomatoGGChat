@@ -160,7 +160,7 @@ void CTomatoGGChatDlg::LayoutChildren()
         if (CWnd* p = GetDlgItem(id)) p->MoveWindow(r);
         };
 
-    // 상단 바: 상태 텍스트(왼쪽, 남는 폭 전부) + [다시 읽기](오른쪽 끝)
+    // 상단 바: 상태 텍스트(왼쪽, 남는 폭 전부) + [새로고침](오른쪽 끝)
     const int BTN_W = 90;
     const int barLeft = (int)rc.left + M;
     const int barRight = (int)rc.right - M;
@@ -415,7 +415,7 @@ void CTomatoGGChatDlg::PollOverview()
 {
     if (m_pollCount > 40) {                                    // ≈28초
         StopScrape();
-        AppendSystem(L"전적 요약을 읽지 못했어요 (시간 초과). 페이지가 다 뜬 뒤 '다시 읽기'를 눌러 보세요.");
+        AppendSystem(L"전적 요약을 읽지 못했어요 (시간 초과). 페이지가 다 뜬 뒤 '새로고침'를 눌러 보세요.");
         UpdateUi();
         return;
     }
@@ -721,6 +721,6 @@ void CTomatoGGChatDlg::RefreshStatus()
     else if (m_phase == Phase::Done)
         s = std::format(L"{} · {} · 전투 {}판 · {}", m_url.nick, RatingLabel(m_data.overview.mode),
             m_data.battles.size(), m_llm.IsBusy() ? L"답변 생성 중" : (m_llm.IsReady() ? L"대화 가능" : L"모델 로딩 중"));
-    else                             s = L"수집 실패 - '다시 읽기'를 눌러 보세요.";
+    else                             s = L"수집 실패 - '새로고침'를 눌러 보세요.";
     m_status.SetWindowText(s.c_str());
 }
