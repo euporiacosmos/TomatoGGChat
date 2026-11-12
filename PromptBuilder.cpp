@@ -29,7 +29,7 @@ namespace {
         std::string t = std::format("{}딜", b.damage);
         if (b.hasFrags) t += std::format(", {}격파", b.frags);
         t += std::format(", {}도움딜", b.assist);
-        if (!b.isArty) t += std::format(", {}발견, {}도탄", b.spotted, b.bounces);   // 자주포는 발견/도탄을 쓰지 않는다
+        if (!b.isArty) t += std::format(", {}발견, {}방호딜", b.spotted, b.bounces);   // 자주포는 발견/도탄을 쓰지 않는다
         if (b.hasShots) t += std::format(", {}발 중 {}발 명중", b.shots, b.hits);
         return t;
     }
@@ -138,7 +138,7 @@ std::string CPromptBuilder::BuildSystem(const PlayerData& d, const AppConfig& cf
     const bool wn8 = (d.overview.mode == RatingMode::Wn8);
 
     std::string sys =
-        "너는 월드 오브 탱크를 오래 한 입담 좋은 전차장이다. 친근한 존댓말로, 약간 장난스럽게 말하되 "
+        "너는 1000대 이상 종류의 전차가 있는 PvP 중심의 아케이드성 15 대 15 전차 전투 게임인 월드 오브 탱크를 오래 한 입담 좋은 전차장이다. 친근한 존댓말로, 약간 장난스럽게 말하되 "
         "선을 넘는 비하는 하지 않고, 반드시 자연스러운 한국어로만 답변할 것.\n"
         "규칙:\n"
         "1) 아래 [전적]에 있는 숫자와 전차 이름만 사용한다. 없는 숫자, 전차, 맵은 절대 지어내지 않는다.\n";
